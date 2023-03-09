@@ -5,8 +5,8 @@ class EntregaBee(wx.Frame):
     def __init__(self, *args, **kw):
         super(EntregaBee, self).__init__(*args, **kw)
         self.InitUI()
-        self.SetMinSize((850, 650))
-        self.ultimo_arquivo_salvo = None  # armazena o nome do último arquivo salvo
+        
+
     def InitUI(self):
         # Cria o painel
         painel = wx.Panel(self)
@@ -35,24 +35,7 @@ class EntregaBee(wx.Frame):
         btn_gravar_copiar = wx.Button(painel, label="GRAVAR/COPIAR")
         btn_imprimir = wx.Button(painel, label="IMPRIMIR")
         btn_carregar = wx.Button(painel, label="CARREGAR")
-        # Adiciona os campos e botões ao layout
-        layout = wx.BoxSizer(wx.VERTICAL)
-        layout.Add(loja_lbl, 0, wx.ALL, 5)
-        layout.Add(self.loja_cmb, 0, wx.EXPAND|wx.ALL, 5)
-        layout.Add(cliente_lbl, 0, wx.ALL, 5)
-        layout.Add(self.cliente_txt, 0, wx.EXPAND|wx.ALL, 5)
-        layout.Add(telefone_lbl, 0, wx.ALL, 5)
-        layout.Add(self.telefone_txt, 0, wx.EXPAND|wx.ALL, 5)
-        layout.Add(produto_lbl, 0, wx.ALL, 5)
-        layout.Add(self.produto_txt, 0, wx.EXPAND|wx.ALL, 5)
-        layout.Add(endereco_lbl, 0, wx.ALL, 5)
-        layout.Add(self.endereco_txt, 0, wx.EXPAND|wx.ALL, 5)
-        layout.Add(complemento_lbl, 0, wx.ALL, 5)
-        layout.Add(self.complemento_txt, 0, wx.EXPAND|wx.ALL, 5)
-        layout.Add(valor_lbl, 0, wx.ALL, 5)
-        layout.Add(self.valor_txt, 0, wx.EXPAND|wx.ALL, 5)
-        layout.Add(pagamento_lbl, 0, wx.ALL, 5)
-        layout.Add(self
+
         # Adiciona os campos e botões ao layout
         layout = wx.BoxSizer(wx.VERTICAL)
         layout.Add(loja_lbl, 0, wx.ALL, 5)
@@ -82,16 +65,19 @@ class EntregaBee(wx.Frame):
         layout.Add(horizontal_box, 0, wx.ALIGN_CENTER)
 
         painel.SetSizer(layout)
+
         # Define o comportamento dos botões
         btn_gravar_copiar.Bind(wx.EVT_BUTTON, self.OnGravarCopiar)
         btn_imprimir.Bind(wx.EVT_BUTTON, self.OnImprimir)
         btn_carregar.Bind(wx.EVT_BUTTON, self.OnCarregar)
-        self.SetMinSize((850, 650))
+        
     def formatar_nome_arquivo(self, cliente, telefone):
             return f"{cliente}_{telefone}.txt"
+
     def OnGravarCopiar(self, e):
             # Define o nome do arquivo formatado
             nome_arquivo = self.formatar_nome_arquivo(self.cliente_txt.GetValue(), self.telefone_txt.GetValue())
+
 
             # Cria o diretório se ele não existir
             if not os.path.exists("Entregas Bee"):
@@ -122,14 +108,26 @@ class EntregaBee(wx.Frame):
 
             # Exibe mensagem de sucesso
             wx.MessageBox("Arquivo gravado com sucesso!", "Sucesso", wx.OK | wx.ICON_INFORMATION)
-    def OnCarregar(self, e):
-        # Verifica se o diretório atual é "Entregas Bee"
-        if os.path.basename(os.getcwd()) != "Entregas Bee":
-            os.chdir("Entregas Bee")
 
-        # Exibe a caixa de diálogo para selecionar o arquivo
-        dlg = wx.FileDialog(self, "Escolha um arquivo", os.getcwd(), "", "*.txt", wx.FD_OPEN)
+
+    def OnImprimir(self, e):
+        # Seleciona a impressora
+        dlg = wx.PrintDialog(self)
         if dlg.ShowModal() == wx.ID_OK:
+            printer = dlg.GetPrintDialogData().GetPrinter()
+            print_data = wx.PrintData(printer)
+            # Imprime o conteúdo do painel
+            self.GetParent().GetParent().GetHandle().PrintWindow(printer.GetHDC(), flags=wx.PW_CLIENT_ONLY)
+            printer.Print(print_data, self.GetParent().GetParent().GetTitle())
+            printer.GetHDC().DeleteDC()
+            dlg.Destroy()
+
+    def OnCarregar(self, e):
+        # Exibe a caixa de diálogo para selecionar o arquivo
+        dlg = wx.FileDialog(self, "Escolha um arquivo", os.path.join(os.getcwd(), "Entrega Bee"), "", "*.txt", wx.FD_OPEN)
+        if dlg.ShowModal() == wx.ID_OK:
+            # Define o diretório de trabalho como "Entrega Bee"
+            os.chdir(os.path.join(os.getcwd(), "Entrega Bee"))
             # Lê o conteúdo do arquivo e preenche os campos
             with open(dlg.GetPath(), "r") as arquivo:
                 linhas = arquivo.readlines()
@@ -142,8 +140,11 @@ class EntregaBee(wx.Frame):
                 self.valor_txt.SetValue(linhas[6].split(":")[1].strip())
                 self.pagamento_cmb.SetValue(linhas[7].split(":")[1].strip())
                 self.obs_txt.SetValue(linhas[8].split(":")[1].strip())
+
+
     def OnClose(self, e):
         self.Destroy()
+
 if __name__ == '__main__':
     app = wx.App()
     janela = EntregaBee(None, title="ENTREGA BEE", size=(850, 650))
