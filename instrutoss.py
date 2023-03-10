@@ -3,9 +3,9 @@ from telegram.ext import Updater, CommandHandler, CallbackContext
 import requests
 
 # API Key da API de Futebol
-API_KEY = 'cb174b53992da29dc4d66044bc7d8ccb53d202a219a830b19e2c409b30fda6a8'
+API_KEY = 'KEY_DO_FUT'
 # Token do Bot do Telegram
-BOT_TOKEN = '6184223447:AAE8H4v3p4oMRukQmknBDGZ-FNHtzze51gQ'
+BOT_TOKEN = 'KEY_DO_TELEGRAM'
 
 # Função para iniciar o bot
 def start(update: Update, context: CallbackContext) -> None:
