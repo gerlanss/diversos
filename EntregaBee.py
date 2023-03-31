@@ -410,9 +410,9 @@ class PdfViewerWindow(QMainWindow):
                 painter.drawPixmap(0, 0, qpixmap)
                 painter.end()
 
-            self.pdf_doc.close()
-            self.hide()  # Esconda a janela do visualizador de PDF
-
+    def closeEvent(self, event):
+        event.ignore()
+        self.hide()
               
 if __name__ == "__main__":
     app = QApplication(sys.argv)
