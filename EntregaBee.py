@@ -5,7 +5,6 @@ import ctypes
 import sys
 import fitz
 import pdfplumber
-from PyQt5 import QtWidgets
 from PyQt5.QtPrintSupport import QPageSetupDialog
 from PyQt5.QtGui import QPdfWriter
 from PyPDF2 import PdfReader
@@ -225,7 +224,7 @@ class EntregaBee(QMainWindow):
         if os.path.exists(fileName):
             # Abrir o arquivo PDF no visualizador
             doc = fitz.open(fileName)
-            pdf_viewer = PdfViewerWindow()
+            pdf_viewer = PdfViewerWindow(self)
             pdf_viewer.view_pdf(doc)
             pdf_viewer.show()
             doc.close()
@@ -299,8 +298,9 @@ class EntregaBee(QMainWindow):
         self.forma_pag_edit.clear()
         self.obs_edit.clear()
 
-class PdfViewerWindow(QtWidgets.QMainWindow):
+class PdfViewerWindow(QMainWindow):
     def __init__(self, parent=None):
+        super().__init__(parent)
         self.setWindowTitle("ENTREGA BEE")
         self.label = QLabel(self)
 
@@ -410,9 +410,9 @@ class PdfViewerWindow(QtWidgets.QMainWindow):
                 painter.drawPixmap(0, 0, qpixmap)
                 painter.end()
 
-    def closeEvent(self, event):
-        event.ignore()
-        self.hide()
+            self.pdf_doc.close()
+            self.hide()  # Esconda a janela do visualizador de PDF
+
               
 if __name__ == "__main__":
     app = QApplication(sys.argv)
