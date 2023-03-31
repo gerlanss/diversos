@@ -224,14 +224,12 @@ class EntregaBee(QMainWindow):
         if os.path.exists(fileName):
             # Abrir o arquivo PDF no visualizador
             doc = fitz.open(fileName)
-            self.pdf_viewer = PdfViewerWindow(self)
-            self.pdf_viewer.setWindowModality(Qt.ApplicationModal)  # Tornar a janela modal
-            self.pdf_viewer.view_pdf(doc)
-            self.pdf_viewer.show()
+            pdf_viewer = PdfViewerWindow(self)
+            pdf_viewer.view_pdf(doc)
+            pdf_viewer.show()
             doc.close()
         else:
             QMessageBox.warning(self, "Arquivo não encontrado", "O arquivo PDF não foi encontrado. Por favor, certifique-se de que o arquivo foi criado.")
-
         
     def abrir_whatsapp(self):
         if platform.system() == "Windows":
@@ -303,11 +301,9 @@ class EntregaBee(QMainWindow):
 class PdfViewerWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Visualizador de PDF")
-        self.setGeometry(100, 100, 800, 600)
+        self.setWindowTitle("ENTREGA BEE")
+        self.label = QLabel(self)
 
-        self.viewer = QPdfWidget(self)
-        self.setCentralWidget(self.viewer)
         # Adicionar botão de imprimir a uma barra de ferramentas
         self.print_button = QPushButton("Imprimir")
         self.print_button.clicked.connect(self.print_pdf)
@@ -362,7 +358,6 @@ class PdfViewerWindow(QMainWindow):
 
     #Visualizador PDF    
     def view_pdf(self, doc):
-        self.viewer.load_document(doc)
         page = doc.load_page(0)  # Carregar a primeira página do documento
         zoom = 1  # Aumentar o fator de zoom para melhorar a qualidade da imagem
         matrix = fitz.Matrix(zoom, zoom)
