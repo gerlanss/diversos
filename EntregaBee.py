@@ -5,6 +5,7 @@ import ctypes
 import sys
 import fitz
 import pdfplumber
+from PyQt5 import QtWidgets
 from PyQt5.QtPrintSupport import QPageSetupDialog
 from PyQt5.QtGui import QPdfWriter
 from PyPDF2 import PdfReader
@@ -312,7 +313,19 @@ class PdfViewerWindow(QMainWindow):
         self.toolbar.addWidget(self.print_button)
 
         self.setCentralWidget(self.label)
+        self.label = QtWidgets.QLabel(self)
+        self.setCentralWidget(self.label)
 
+        self.toolbar = QtWidgets.QToolBar(self)
+        self.addToolBar(Qt.TopToolBarArea, self.toolbar)
+
+        self.action_print = QtWidgets.QAction(QIcon(":/icons/print.png"), "Imprimir", self)
+        self.action_print.triggered.connect(self.print_pdf)
+        self.toolbar.addAction(self.action_print)
+
+        self.action_close = QtWidgets.QAction(QIcon(":/icons/close.png"), "Fechar", self)
+        self.action_close.triggered.connect(self.close)
+        self.toolbar.addAction(self.action_close)
         # Centralizar janela na tela
         screen = QDesktopWidget().screenGeometry()
         self.setGeometry(int(screen.width() / 2 - 250), int(screen.height() / 2 - 250), 400, 600)
@@ -413,7 +426,10 @@ class PdfViewerWindow(QMainWindow):
             self.pdf_doc.close()
             self.hide()  # Esconda a janela do visualizador de PDF
 
-              
+    def closeEvent(self, event):
+        self.hide()
+        event.ignore() 
+        
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon("icon.png"))
