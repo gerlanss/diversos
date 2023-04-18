@@ -2,20 +2,11 @@ import os
 import subprocess
 import platform
 import ctypes
+from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
+from PyQt5.QtGui import QFont, QImage, QClipboard, QIcon, QPixmap, QPainter, QTextDocument
+from PyQt5.QtCore import Qt, QRect,QSizeF
+from PyQt5.QtWidgets import QApplication, QMainWindow, QComboBox, QMessageBox, QLineEdit, QLabel, QPushButton, QTextEdit, QHBoxLayout, QWidget, QFileDialog, QVBoxLayout, QDesktopWidget
 import sys
-import fitz
-import pdfplumber
-from PyQt5 import QtWidgets
-from PyQt5.QtPrintSupport import QPageSetupDialog
-from PyQt5.QtGui import QPdfWriter
-from PyPDF2 import PdfReader
-from PyQt5.QtWidgets import QVBoxLayout, QDesktopWidget, QSizePolicy, QSpacerItem, QVBoxLayout, QAction, QToolBar, QApplication, QMainWindow, QComboBox, QMessageBox, QLineEdit, QLabel, QPushButton, QTextEdit, QHBoxLayout, QVBoxLayout, QWidget, QFileDialog
-from PyQt5.QtGui import QIcon, QClipboard, QFont, QPainter, QImage, QPixmap, QColor
-from PyQt5.QtCore import Qt, QRect
-from PyQt5.QtWidgets import QApplication, QMainWindow, QComboBox, QMessageBox, QLineEdit, QLabel, QPushButton, QTextEdit, QHBoxLayout, QWidget, QFileDialog
-from PyQt5.QtPrintSupport import QPrintDialog, QPrinter
-from fpdf import FPDF
-
 
 class EntregaBee(QMainWindow):
     def __init__(self):
@@ -25,7 +16,8 @@ class EntregaBee(QMainWindow):
             myappid = 'Entrega Bee 4.0'  # Um identificador arbitrário para o aplicativo
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
             self.setWindowIcon(QIcon('favicon.ico'))
-            self.clipboard = QApplication.clipboard()
+            self.centralizar()
+
 # definir janela principal
         self.setWindowTitle("ENTREGA BEE")
         self.setGeometry(100, 100, 500, 400)
@@ -71,6 +63,9 @@ class EntregaBee(QMainWindow):
 
         self.limpar_btn = QPushButton("LIMPAR")
         hbox.addWidget(self.limpar_btn)
+        
+        self.carregar_btn = QPushButton("CARREGAR")
+        hbox.addWidget(self.carregar_btn)
         # Adicione esta linha para criar a instância do clipboard
         self.clipboard = QApplication.clipboard()
 
@@ -107,31 +102,11 @@ class EntregaBee(QMainWindow):
         self.enviar_btn.clicked.connect(self.abrir_whatsapp)
         self.abrir_btn.clicked.connect(self.abrir)      
         self.limpar_btn.clicked.connect(self.limpar)
-        
-    def formatar_telefone(self):
-        telefone = self.telefone_edit.text()
-        telefone = telefone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-        if len(telefone) == 11:
-            telefone = f"({telefone[:2]}) {telefone[2:7]}-{telefone[7:]}"
-        elif len(telefone) == 10:
-            telefone = f"({telefone[:2]}) {telefone[2:6]}-{telefone[6:]}"
-        self.telefone_edit.setText(telefone)
-        
-    def valor_edit_focusInEvent(self, event):
-        if self.valor_edit.text() == "":
-            self.valor_edit.setText("R$")
-            
-    def formatar_valor(self):
-        valor = self.valor_edit.text().replace("R$", "").replace(",", ".").strip()
-        if valor:
-            try:
-                valor = float(valor)
-                self.valor_edit.setText(f"R$ {valor:.2f}")
-            except ValueError:
-                QMessageBox.warning(self, "Valor inválido", "O valor informado não é válido. Por favor, corrija-o.")
-                self.valor_edit.setText("R$")
+        self.carregar_btn.clicked.connect(self.carregar_formulario)
     
+    #Gravar e copiar dados do formulario    
     def gravar_copiar(self):
+        # obter dados do formulário
         loja = self.loja_combo.currentText()
         cliente = self.cliente_edit.text().upper()
         telefone = self.telefone_edit.text().upper()
@@ -141,32 +116,29 @@ class EntregaBee(QMainWindow):
         forma_pag = self.forma_pag_edit.text().upper()
         obs = self.obs_edit.toPlainText().upper()
 
-        # Verificar se pasta de Entrega Bee existe
+        # verificar se pasta de Entrega Bee existe
         if not os.path.exists(os.path.join(os.path.expanduser('~'), "Documents", "Entrega Bee")):
             os.makedirs(os.path.join(os.path.expanduser('~'), "Documents", "Entrega Bee"))
 
-        # Criar arquivo PDF
-        filename = os.path.join(os.path.expanduser('~'), "Documents", "Entrega Bee", f"{cliente}_{telefone}.pdf")
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=11)
+        # criar arquivo de texto
+        filename = os.path.join(os.path.expanduser('~'), "Documents", "Entrega Bee", f"{cliente}_{telefone}.txt")
+        with open(filename, "w") as f:
+            f.write(f"ENTREGA BEE\n")
+            f.write(f"LOJA: {loja}\n")  # Modifique esta linha
+            f.write(f"CLIENTE: {cliente}\n")
+            f.write(f"TELEFONE: {telefone}\n")
+            f.write(f"PRODUTO: {produto}\n")
+            f.write(f"ENDEREÇO: {endereco}\n")
+            f.write(f"VALOR: {valor}\n")
+            f.write(f"PAGAMENTO: {forma_pag}\n")
+            f.write(f"OBSERVAÇÕES: {obs}\n")
 
-        pdf.cell(200, 10, txt=f"LOJA: {loja}", ln=1)
-        pdf.cell(200, 10, txt=f"CLIENTE: {cliente}", ln=1)
-        pdf.cell(200, 10, txt=f"TELEFONE: {telefone}", ln=1)
-        pdf.cell(200, 10, txt=f"PRODUTO: {produto}", ln=1)
-        pdf.cell(200, 10, txt=f"ENDEREÇO: {endereco}", ln=1)
-        pdf.cell(200, 10, txt=f"VALOR: {valor}", ln=1)
-        pdf.cell(200, 10, txt=f"PAGAMENTO: {forma_pag}", ln=1)
-        pdf.cell(200, 10, txt=f"OBSERVAÇÕES: {obs}", ln=1)
-
-        pdf.output(name=filename)
-
-        # Copiar para a área de transferência
-        mensagem_formatada = f"*ENTREGA BEE*\n\n*LOJA:* {loja}\n*CLIENTE:* {cliente}\n*TELEFONE:* {telefone}\n*PRODUTO:* {produto}\n*ENDEREÇO:* {endereco}\n*VALOR:* {valor}\n*PAGAMENTO:* {forma_pag}\n*OBSERVAÇÕES:* {obs}"
+        # copiar para a área de transferência
+        mensagem_formatada = f"*ENTREGA BEE*\n\n*LOJA:* {loja}\n*CLIENTE:* {cliente}\n*TELEFONE:* {telefone}\n*PRODUTO:* {produto}\n*ENDEREÇO:* {endereco}\n*VALOR:* {valor}\n*PAGAMENTO:* {forma_pag}\n*OBSERVAÇÕES:* {obs}\n\n\n"
         self.clipboard.setText(mensagem_formatada)
+        # exibir caixa de mensagem
+        QMessageBox.information(self, "Gravado e Copiado", "Formulario Gravado e copiado com sucesso ^_^")
 
-        QMessageBox.information(self, "Gravado e Copiado", "Os dados foram gravados e copiados para a área de transferência.")
     #Usar codificadores para ler documentos com varios caracteres
     def read_file_with_multiple_encodings(self, file_path, encodings=("utf-8", "cp1252", "latin-1")):
         for encoding in encodings:
@@ -177,262 +149,218 @@ class EntregaBee(QMainWindow):
             except UnicodeDecodeError:
                 pass
         raise UnicodeDecodeError("Nenhuma das codificações fornecidas funcionou.")
-    
-    
-    def get_last_saved_file(self):
-        folder_path = os.path.join(os.path.expanduser('~'), "Documents", "Entrega Bee")
-        files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.txt')]
-        if not files:
-            return None
-        latest_file = max(files, key=os.path.getmtime)
-        return latest_file
-        
-    def render_pdf(self, printer, painter):
-        with painter:
-            loja = self.loja_combo.currentText()
-            cliente = self.cliente_edit.text().upper()
-            telefone = self.telefone_edit.text().upper()
-            produto = self.produto_edit.text().upper()
-            endereco = self.endereco_edit.text().upper()
-            valor = self.valor_edit.text().upper()
-            forma_pag = self.forma_pag_edit.text().upper()
-            obs = self.obs_edit.toPlainText().upper()
 
-            printer.setPageSize(QPrinter.Letter)
-            printer.setFullPage(True)
-            painter.setFont(QFont("Arial", 12))
-            yOffset = 40
-            painter.drawText(40, yOffset, f"LOJA: {loja}")
-            yOffset += 20
-            painter.drawText(40, yOffset, f"CLIENTE: {cliente}")
-            yOffset += 20
-            painter.drawText(40, yOffset, f"TELEFONE: {telefone}")
-            yOffset += 20
-            painter.drawText(40, yOffset, f"PRODUTO: {produto}")
-            yOffset += 20
-            painter.drawText(40, yOffset, f"ENDEREÇO: {endereco}")
-            yOffset += 20
-            painter.drawText(40, yOffset, f"VALOR: {valor}")
-            yOffset += 20
-            painter.drawText(40, yOffset, f"PAGAMENTO: {forma_pag}")
-            yOffset += 20
-            painter.drawText(40, yOffset, f"OBSERVAÇÕES: {obs}")
-        
+    #Selecionar impressora para imprimir
     def imprimir(self):
-        fileName = os.path.join(os.path.expanduser('~'), "Documents", "Entrega Bee", f"{self.cliente_edit.text()}_{self.telefone_edit.text()}.pdf")
+        loja = self.loja_combo.currentText()
+        cliente = self.cliente_edit.text().upper()
+        telefone = self.telefone_edit.text().upper()
+        produto = self.produto_edit.text().upper()
+        endereco = self.endereco_edit.text().upper()
+        valor = self.valor_edit.text().upper()
+        forma_pag = self.forma_pag_edit.text().upper()
+        obs = self.obs_edit.toPlainText().upper()
 
-        # Verificar se o arquivo existe
-        if os.path.exists(fileName):
-            # Abrir o arquivo PDF no visualizador
-            doc = fitz.open(fileName)
-            pdf_viewer = PdfViewerWindow(self)
-            pdf_viewer.view_pdf(doc)
-            pdf_viewer.show()
-            doc.close()
-        else:
-            QMessageBox.warning(self, "Arquivo não encontrado", "O arquivo PDF não foi encontrado. Por favor, certifique-se de que o arquivo foi criado.")
-        
+        # Carregar logo como QImage
+        logo = QImage("logo.png")
+
+        # Ajustar a largura para 80 mm (aproximadamente 630 pixels) e altura para 1600
+        image_width = 270
+        image_height = 100000
+
+        # Criar uma QImage com um fundo branco
+        image = QImage(image_width, image_height, QImage.Format_RGB32)
+        image.fill(Qt.white)
+
+        # Criar um QPainter para desenhar na QImage
+        painter = QPainter(image)
+        painter.setPen(Qt.black)
+
+        # Desenhar a logo na QImage
+        logo_x = 10  # Ajustar a posição X da logo
+        logo_y = 10  # Ajustar a posição Y da logo
+        logo_width = 100  # Ajustar a largura da logo
+        logo_height = 100  # Ajustar a altura da logo
+        painter.drawImage(QRect(logo_x, logo_y, logo_width, logo_height), logo)
+
+        # Definir o tamanho da fonte
+        font = QFont()
+        font.setPointSize(12)  # Aumentar o tamanho da fonte
+        painter.setFont(font)
+
+        # Desenhar o texto na QImage
+        y = 120  # Ajustar a posição inicial do texto (abaixo da logo)
+        line_height = 25  # Ajustar a altura da linha
+        def draw_text_wrapped(text, max_width):
+            nonlocal y
+            words = text.split()
+            line = ""
+            for word in words:
+                if painter.fontMetrics().horizontalAdvance(line + " " + word) < max_width:
+                    line += " " + word
+                else:
+                    painter.drawText(QRect(20, y, max_width, line_height), Qt.AlignLeft, line)  # Ajustar a posição do texto
+                    y += line_height
+                    line = word
+            painter.drawText(QRect(20, y, max_width, line_height), Qt.AlignLeft, line)  # Ajustar a posição do texto
+            y += line_height
+
+        draw_text_wrapped(f"CLIENTE: {cliente}", image_width - 20)
+        draw_text_wrapped(f"TELEFONE: {telefone}", image_width - 20)
+        draw_text_wrapped(f"PRODUTO: {produto}", image_width - 20)
+        draw_text_wrapped(f"ENDEREÇO: {endereco}", image_width - 20)
+        draw_text_wrapped(f"VALOR: {valor}", image_width - 20)
+        draw_text_wrapped(f"PAGAMENTO: {forma_pag}", image_width - 20)
+        draw_text_wrapped(f"OBSERVAÇÕES: {obs}", image_width - 20)
+
+        # Finalizar a pintura
+        painter.end()
+
+        # Imprimir a QImage
+        printer = QPrinter()
+        printer.setPageSize(QPrinter.Custom)
+        printer.setPaperSize(QSizeF(image.width() / 20, image.height() / 20), QPrinter.Inch)
+        printer.setFullPage(True)
+        printer.setResolution(600)  # Defina a resolução desejada aqui (ex: 300 DPI)
+
+        print_dialog = QPrintDialog(printer, self)
+        if print_dialog.exec_() == QPrintDialog.Accepted:
+            painter.begin(printer)
+            painter.drawImage(QRect(0, 0, image.width(), image.height()), image)
+            painter.end()
+                    
+    #Abrir app do Whatsapp        
     def abrir_whatsapp(self):
         if platform.system() == "Windows":
             try:
                 subprocess.Popen("explorer shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App")
             except FileNotFoundError:
                 pass
-
-    def extract_text_from_pdf(self, file_path):
-        with pdfplumber.open(file_path) as pdf:
-            text = ''
-            for page in pdf.pages:
-                text += page.extract_text()
-        return text
-
-           
+            
     def abrir(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.ReadOnly
-        fileName, _ = QFileDialog.getOpenFileName(self, "Abrir arquivo PDF", os.path.join(os.path.expanduser('~'), "Documents", "Entrega Bee"), "PDF Files (*.pdf)", options=options)
-        if fileName:
-            # Extrair o texto do arquivo PDF
-            text = self.extract_text_from_pdf(fileName)
+        # abrir arquivo para edição
+        folder_path = os.path.join(os.path.expanduser('~'), "Documents", "Entrega Bee")
+        filename, _ = QFileDialog.getOpenFileName(self, "Abrir arquivo", folder_path, "Arquivos de texto (*.txt)")
+        if filename:
+            with open(filename, "r") as f:
+                lines = f.readlines()
+            if lines:
+                loja = lines[1].split(":")[1].strip()
+                cliente = lines[2].split(":")[1].strip()
+                telefone = lines[3].split(":")[1].strip()
+                produto = lines[4].split(":")[1].strip()
+                endereco = lines[5].split(":")[1].strip()
+                valor = lines[6].split(":")[1].strip()
+                forma_pag = lines[7].split(":")[1].strip()
+                obs = lines[8].split(":")[1].strip()
 
-            # Função para preencher o formulário com base no texto extraído
-            self.fill_form_from_pdf_text(text)
-
-    def fill_form_from_pdf_text(self, text):
-        lines = text.split('\n')
-
-        for line in lines:
-            if line.startswith("LOJA:"):
-                loja = line.replace("LOJA:", "").strip()
-                index = self.loja_combo.findText(loja)
-                if index != -1:
-                    self.loja_combo.setCurrentIndex(index)
-            elif line.startswith("CLIENTE:"):
-                cliente = line.replace("CLIENTE:", "").strip()
+                # preencher formulário
+                self.loja_combo.setCurrentText(loja)
                 self.cliente_edit.setText(cliente)
-            elif line.startswith("TELEFONE:"):
-                telefone = line.replace("TELEFONE:", "").strip()
                 self.telefone_edit.setText(telefone)
-            elif line.startswith("PRODUTO:"):
-                produto = line.replace("PRODUTO:", "").strip()
                 self.produto_edit.setText(produto)
-            elif line.startswith("ENDEREÇO:"):
-                endereco = line.replace("ENDEREÇO:", "").strip()
                 self.endereco_edit.setText(endereco)
-            elif line.startswith("VALOR:"):
-                valor = line.replace("VALOR:", "").strip()
                 self.valor_edit.setText(valor)
-            elif line.startswith("PAGAMENTO:"):
-                forma_pag = line.replace("PAGAMENTO:", "").strip()
                 self.forma_pag_edit.setText(forma_pag)
-            elif line.startswith("OBSERVAÇÕES:"):
-                obs = line.replace("OBSERVAÇÕES:", "").strip()
                 self.obs_edit.setPlainText(obs)
+                
+        #carregar formulario da area de transferencia            
+    def carregar_formulario(self):
+        # obter texto copiado
+        clipboard_text = QApplication.clipboard().text()
+
+        # verificar se o texto copiado contém os campos do formulário
+        if not ("LOJA:" in clipboard_text and "CLIENTE:" in clipboard_text and "TELEFONE:" in clipboard_text and "PRODUTO:" in clipboard_text and "ENDEREÇO:" in clipboard_text and "VALOR:" in clipboard_text and "PAGAMENTO:" in clipboard_text and "OBSERVAÇÕES:" in clipboard_text):
+            QMessageBox.warning(self, "Erro ao carregar formulário", "<center>Ei, isso não me pertence!<br>Copie o formulario do Whatsapp e tente novamente ;-)</center>")
+            return
+
+        # separar os campos do texto copiado
+        loja = clipboard_text.split("LOJA:")[1].split("CLIENTE:")[0].strip()
+        cliente = clipboard_text.split("CLIENTE:")[1].split("TELEFONE:")[0].strip()
+        telefone = clipboard_text.split("TELEFONE:")[1].split("PRODUTO:")[0].strip()
+        produto = clipboard_text.split("PRODUTO:")[1].split("ENDEREÇO:")[0].strip()
+        endereco = clipboard_text.split("ENDEREÇO:")[1].split("VALOR:")[0].strip()
+        valor = clipboard_text.split("VALOR:")[1].split("PAGAMENTO:")[0].strip()
+        forma_pag = clipboard_text.split("PAGAMENTO:")[1].split("OBSERVAÇÕES:")[0].strip()
+        obs_start = clipboard_text.find("OBSERVAÇÕES:") + len("OBSERVAÇÕES:")
+        obs = clipboard_text[obs_start:]
+        obs_end = obs.find("@")
+        if obs_end != -1:
+            obs = obs[:obs_end]
+            self.obs_edit.setPlainText(obs)
+        else:
+            self.obs_edit.setPlainText("")
 
 
-    def limpar(self):
+        # preencher widgets do formulário com os valores correspondentes
+        self.loja_combo.setCurrentIndex(-1)
         self.cliente_edit.clear()
         self.telefone_edit.clear()
         self.produto_edit.clear()
         self.endereco_edit.clear()
-        self.valor_edit.setText("R$")
+        self.valor_edit.clear()
         self.forma_pag_edit.clear()
         self.obs_edit.clear()
+        self.loja_combo.setCurrentText(loja)
+        self.cliente_edit.setText(cliente)
+        self.telefone_edit.setText(telefone)
+        self.produto_edit.setText(produto)
+        self.endereco_edit.setText(endereco)
+        self.valor_edit.setText(valor)
+        self.forma_pag_edit.setText(forma_pag)
+        self.obs_edit.setPlainText(obs)
 
-class PdfViewerWindow(QMainWindow):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("ENTREGA BEE")
-        self.label = QLabel(self)
 
-        # Adicionar botão de imprimir a uma barra de ferramentas
-        self.print_button = QPushButton("Imprimir")
-        self.print_button.clicked.connect(self.print_pdf)
-        self.print_button.setShortcut('Ctrl+P')
-        self.toolbar = self.addToolBar("Imprimir")
-        self.toolbar.addWidget(self.print_button)
-
-        self.setCentralWidget(self.label)
-        self.label = QtWidgets.QLabel(self)
-        self.setCentralWidget(self.label)
-
-        self.toolbar = QtWidgets.QToolBar(self)
-        self.addToolBar(Qt.TopToolBarArea, self.toolbar)
-
-        self.action_print = QtWidgets.QAction(QIcon(":/icons/print.png"), "Imprimir", self)
-        self.action_print.triggered.connect(self.print_pdf)
-        self.toolbar.addAction(self.action_print)
-
-        self.action_close = QtWidgets.QAction(QIcon(":/icons/close.png"), "Fechar", self)
-        self.action_close.triggered.connect(self.close)
-        self.toolbar.addAction(self.action_close)
-        # Centralizar janela na tela
-        screen = QDesktopWidget().screenGeometry()
-        self.setGeometry(int(screen.width() / 2 - 250), int(screen.height() / 2 - 250), 400, 600)
+    # limpar formulário
+    def limpar(self):
+        self.loja_combo.setCurrentIndex(0)
+        self.cliente_edit.clear()
+        self.telefone_edit.clear()
+        self.produto_edit.clear()
+        self.endereco_edit.clear()
+        self.valor_edit.clear()
+        self.forma_pag_edit.clear()
+        self.obs_edit.clear()
         
-    #Cortar imagem antes de colocar no visualizador PDF
-    def crop_image(self, image):
-        # Converta QImage para QPixmap
-        pixmap = QPixmap.fromImage(image)
+        #formatar telefone 
+    def formatar_telefone(self):
+        telefone = self.telefone_edit.text()
+        if len(telefone) == 11 and not telefone.startswith("("):
+            telefone_formatado = f"({telefone[:2]}) {telefone[2:6]}-{telefone[6:]}"
+            self.telefone_edit.setText(telefone_formatado)
 
-        # Obtenha a cor de fundo do canto superior esquerdo
-        background_color = QColor(image.pixel(0, 0))
-
-        # Encontre os limites da área de conteúdo
-        left, top, right, bottom = 0, 0, pixmap.width(), pixmap.height()
-
-        for x in range(pixmap.width()):
-            for y in range(pixmap.height()):
-                if QColor(pixmap.toImage().pixel(x, y)) != background_color:
-                    left = x
-                    break
-            if left > 0:
-                break
-
-        for x in range(pixmap.width() - 1, -1, -1):
-            for y in range(pixmap.height()):
-                if QColor(pixmap.toImage().pixel(x, y)) != background_color:
-                    right = x + 1
-                    break
-            if right < pixmap.width():
-                break
-
-        for y in range(pixmap.height() - 1, -1, -1):
-            for x in range(pixmap.width()):
-                if QColor(pixmap.toImage().pixel(x, y)) != background_color:
-                    bottom = y + 1
-                    break
-            if bottom < pixmap.height():
-                break
-
-        # Corte a imagem
-        cropped_pixmap = pixmap.copy(left, top, right - left, bottom - top)
-        return cropped_pixmap
-
-    #Visualizador PDF    
-    def view_pdf(self, doc):
-        page = doc.load_page(0)  # Carregar a primeira página do documento
-        zoom = 1  # Aumentar o fator de zoom para melhorar a qualidade da imagem
-        matrix = fitz.Matrix(zoom, zoom)
-        pixmap = page.get_pixmap(matrix=matrix, alpha=False)
-
-        image = QImage(pixmap.samples, pixmap.width, pixmap.height, pixmap.stride, QImage.Format_RGB888)
-        pixmap = QPixmap.fromImage(image)
-
-        # Cortar a imagem para remover o fundo em branco
-        cropped_pixmap = self.crop_image(image)
-
-        # Redimensionar a imagem proporcionalmente para caber na janela
-        max_width = self.width() - 20
-        max_height = self.height() - 20 - self.toolbar.height()
-        scaled_pixmap = cropped_pixmap.scaled(max_width, max_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-
-        # Ajustar o tamanho da janela ao novo tamanho da imagem
-        new_window_width = scaled_pixmap.width() + 20
-        new_window_height = scaled_pixmap.height() + 20 + self.toolbar.height()
-        self.resize(new_window_width, new_window_height)
-
-        self.label.setPixmap(scaled_pixmap)
-        self.label.resize(scaled_pixmap.width(), scaled_pixmap.height())
-
-        self.pdf_doc = doc
-      
-    def print_pdf(self):
-        if not hasattr(self, 'pdf_doc'):
+        #Formatar valor
+    def formatar_valor(self):
+        valor = self.valor_edit.text().replace(',', '.').replace('R$', '').strip()
+        if not valor:
             return
-
-        printer = QPrinter()
-        printer.setPageSize(QPrinter.Letter)
-        printer.setOutputFormat(QPrinter.NativeFormat)
-
-        print_dialog = QPrintDialog(printer, self)
-        if print_dialog.exec_() == QPrintDialog.Accepted:
-            # Defina o número total de páginas a serem impressas
-            printer.setFromTo(1, self.pdf_doc.page_count)
-
-            # Prepare o documento para a impressão
-            for i in range(self.pdf_doc.page_count):
-                page = self.pdf_doc.load_page(i)
-                zoom = 1
-                matrix = fitz.Matrix(zoom, zoom)
-                pixmap = page.get_pixmap(matrix=matrix, alpha=False)
-                image = QImage(pixmap.samples, pixmap.width, pixmap.height, pixmap.stride, QImage.Format_RGB888)
-                qpixmap = QPixmap.fromImage(image)
-                printer.newPage()
-                painter = QPainter(printer)
-                painter.drawPixmap(0, 0, qpixmap)
-                painter.end()
-
-            self.pdf_doc.close()
-            self.hide()  # Esconda a janela do visualizador de PDF
-
-    def closeEvent(self, event):
-        self.hide()
-        event.ignore() 
+        try:
+            valor_float = float(valor)
+            valor_formatado = f"R$ {valor_float:,.2f}".replace(",", "x").replace(".", ",").replace("x", ".")
+            self.valor_edit.setText(valor_formatado)
+        except ValueError:
+            pass
+        #verificar se campo valor está vazio
+    def valor_edit_focusInEvent(self, event):
+        valor = self.valor_edit.text()
+        if valor == 'R$ 0,00':
+            self.valor_edit.clear()
+            self.valor_edit.setPlaceholderText("R$")
+        elif not valor.startswith("R$"):
+            self.valor_edit.setText(f"R$ {valor}")
+        super(QLineEdit, self.valor_edit).focusInEvent(event)
         
-if __name__ == "__main__":
+        #Centralizar Janela
+    def centralizar(self):
+        frame = self.frameGeometry()
+        center_point = QDesktopWidget().availableGeometry().center()
+        frame.moveCenter(center_point)
+        self.move(frame.topLeft())
+    
+
+# definir janela principal
+if __name__ == '__main__':
     app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon("icon.png"))
-    main = EntregaBee()
-    main.show()
+    window = EntregaBee()
+    window.show()
     sys.exit(app.exec_())
