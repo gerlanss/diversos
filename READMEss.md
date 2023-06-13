@@ -1,5 +1,3 @@
-Claro, posso fazer isso. Aqui está a versão revisada:
-
 **Mercúrio**
 
 **Fauna**:
