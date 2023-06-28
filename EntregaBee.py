@@ -5,11 +5,10 @@ import ctypes
 import qrcode
 from PIL import Image, ImageDraw, ImageOps
 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
-from PyQt5.QtGui import QFont, QImage, QPixmap, QIcon, QPainter, QTextDocument, QFontMetrics, QAbstractTextDocumentLayout, QTextOption, QPageSize
+from PyQt5.QtGui import QFont, QImage, QPixmap, QIcon, QPainter, QTextDocument, QFontMetrics, QAbstractTextDocumentLayout, QTextOption
 from PyQt5.QtCore import Qt, QRect, QSizeF, QEvent, QRectF
 from PyQt5.QtWidgets import QApplication, QDialog, QPlainTextEdit, QMainWindow, QComboBox, QMessageBox, QLineEdit, QLabel, QPushButton, QTextEdit, QHBoxLayout, QWidget, QFileDialog, QVBoxLayout, QDesktopWidget
 import sys
-
 
 class CustomPlainTextEdit(QPlainTextEdit):
     def __init__(self, *args, **kwargs):
@@ -22,7 +21,6 @@ class CustomPlainTextEdit(QPlainTextEdit):
             return True
         return super().eventFilter(obj, event)
 
-    
 class Entregas(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -302,81 +300,72 @@ class Entregas(QMainWindow):
 
     def imprimir(self):
         printer = QPrinter(QPrinter.HighResolution)
+        printer.setPageSize(QPrinter.Custom)
+        printer.setPaperSize(QSizeF(74, 105), QPrinter.Millimeter)  #Define o tamanho da página como A7 (74 x 105 mm)
         printer.setPageMargins(2, 2, 2, 2, QPrinter.Millimeter)
         printer.setOutputFormat(QPrinter.NativeFormat)
 
         dialog = QPrintDialog(printer, self)
 
+        painter = QPainter()
         if dialog.exec_() == QDialog.Accepted:
-            dpi = printer.resolution()
-            font_size = round(16 * dpi / 96)  # Ajusta o tamanho da fonte com base na resolução da impressora
-            line_spacing = font_size * 0.5
-
-            painter = QPainter()
             painter.begin(printer)
-            font = QFont("Arial", font_size)
+            font = QFont("Arial", 18)
             painter.setFont(font)
-
-            # Ajusta a largura do documento para 80mm
-            mm_width = 80
-            doc_width = int(mm_width / 25.4 * dpi)
-
-            total_height = 0
 
             logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")
             logo = QImage(logo_path)
-            scaled_logo = logo.scaled(100, 100, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            scaled_logo = logo.scaledToWidth(100, Qt.SmoothTransformation)
             logo_rect = QRect(0, 0, scaled_logo.width(), scaled_logo.height())
             painter.drawImage(logo_rect, scaled_logo)
-            total_height += scaled_logo.height()
 
             loja_id = self.loja_combo.currentText().split(" - ")[0]
             loja_info = self.loja_info.get(loja_id, {"TELEFONE": "", "WHATSAPP": ""})
             phone_text = loja_info["TELEFONE"]
             whatsapp_text = loja_info["WHATSAPP"]
 
-            phone_font = QFont("Arial", font_size)  # Ajusta o tamanho da fonte com base na resolução da impressora
-            painter.setFont(phone_font)
-            painter.translate(scaled_logo.width(), 0)
+            phone_font = QFont("Arial", 18)
 
+            painter.translate(120, 5)
             phone_doc = QTextDocument()
             phone_doc.setDefaultFont(phone_font)
             phone_doc.setPlainText(phone_text)
-            phone_doc.setTextWidth(doc_width / 2)
+            phone_doc.setTextWidth(printer.pageRect().width())
 
             phone_ctx = QAbstractTextDocumentLayout.PaintContext()
             phone_layout = phone_doc.documentLayout()
             phone_layout.draw(painter, phone_ctx)
 
-            painter.translate(0, phone_doc.size().height() + line_spacing) # Adicione a altura do telefone à altura total
-
-            whatsapp_font = QFont("Arial", font_size)  # Ajusta o tamanho da fonte com base na resolução da impressora
-            painter.translate(0, phone_doc.size().height + line_spacing)
+            painter.resetTransform()
+            painter.translate(120, 50)
             whatsapp_doc = QTextDocument()
-            whatsapp_doc.setDefaultFont(whatsapp_font)
+            whatsapp_doc.setDefaultFont(phone_font)
             whatsapp_doc.setPlainText(whatsapp_text)
-            whatsapp_doc.setTextWidth(doc_width / 2)
+            whatsapp_doc.setTextWidth(printer.pageRect().width())
 
             whatsapp_ctx = QAbstractTextDocumentLayout.PaintContext()
             whatsapp_layout = whatsapp_doc.documentLayout()
             whatsapp_layout.draw(painter, whatsapp_ctx)
 
-            total_height += whatsapp_doc.size().height() + line_spacing  # Adicione a altura do whatsapp à altura total
+            painter.resetTransform()
+            painter.translate(0, logo_rect.height() + 10)
 
-            painter.setFont(font)
-            painter.translate(-scaled_logo.width(), total_height)
+            bold_font = QFont("Arial", 20, QFont.Bold)
 
-            campos = [
-                ("LOJA: ", self.loja_combo.currentText().upper().splitlines()),
-                ("CLIENTE: ", self.cliente_edit.text().upper().splitlines()),
-                ("TELEFONE: ", self.telefone_edit.text().upper().splitlines()),
-                ("PRODUTO: ", self.produto_edit.toPlainText().upper().splitlines()),
-                ("ENDEREÇO: ", self.endereco_edit.text().upper().splitlines()),
-                ("VALOR: ", self.valor_edit.text().upper().splitlines()),
-                ("FORMA DE PAGAMENTO: ", self.forma_pag_edit.text().upper().splitlines()),
-                ("OBSERVAÇÕES: ", self.obs_edit.toPlainText().upper().splitlines()),
-            ]
+        campos = [
+            ("LOJA: ", self.loja_combo.currentText().upper()),
+            ("CLIENTE: ", self.cliente_edit.text().upper()),
+            ("TELEFONE: ", self.telefone_edit.text().upper()),
+            ("PRODUTO: ", self.produto_edit.toPlainText().upper().splitlines()),  # Altere esta linha para incluir quebras de linha
+            ("ENDEREÇO: ", self.endereco_edit.text().upper()),
+            ("VALOR: ", self.valor_edit.text().upper()),
+            ("FORMA DE PAGAMENTO: ", self.forma_pag_edit.text().upper()),
+            ("OBSERVAÇÕES: ", self.obs_edit.toPlainText().upper()),
+        ]
 
+        line_spacing = 5
+
+        try:
             for titulo, texto in campos:
                 if not texto:
                     continue
@@ -390,36 +379,81 @@ class Entregas(QMainWindow):
                         else:
                             full_text = line
 
+                        painter.setFont(font)
+                        option = QTextOption()
+                        option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+
                         doc = QTextDocument()
                         doc.setDefaultFont(font)
                         doc.setHtml(full_text)
-                        doc.setTextWidth(doc_width)
-                        option = QTextOption()
-                        option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+                        doc.setTextWidth(printer.pageRect().width())
                         doc.setDefaultTextOption(option)
 
                         ctx = QAbstractTextDocumentLayout.PaintContext()
                         layout = doc.documentLayout()
+
                         layout.draw(painter, ctx)
                         painter.translate(0, doc.size().height() + line_spacing)
                 else:
                     full_text = f'<b>{titulo}</b>{texto}'
+                    painter.setFont(font)
+                    option = QTextOption()
+                    option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+
                     doc = QTextDocument()
                     doc.setDefaultFont(font)
                     doc.setHtml(full_text)
-                    doc.setTextWidth(doc_width)
-                    option = QTextOption()
-                    option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+                    doc.setTextWidth(printer.pageRect().width())
                     doc.setDefaultTextOption(option)
 
                     ctx = QAbstractTextDocumentLayout.PaintContext()
                     layout = doc.documentLayout()
+
                     layout.draw(painter, ctx)
                     painter.translate(0, doc.size().height() + line_spacing)
+        except UnboundLocalError:
+            pass  # Ignora o erro e continua a execução do código
 
-            if painter.isActive():  # Verifique se o pintor está ativo antes de finalizá-lo
-                painter.end()
+        if painter.isActive():  # Verifique se o pintor está ativo antes de finalizá-lo
+            painter.end()
+        
+    def preparar_impressao(self, printer):
+        painter = QPainter(printer)
 
+        logo_rect = QRectF(25, 25, 130, 65)
+        logo_image = QImage("logo.png")
+        painter.drawImage(logo_rect, logo_image)
+
+        painter.setFont(QFont("Arial", 18))
+
+        telefone_x = 150
+        telefone_y = 10
+        telefone_text = "TELEFONE: (00) 00000-0000"
+        painter.drawText(telefone_x, telefone_y, telefone_text)
+
+        whatsapp_x = 150
+        whatsapp_y = 30
+        whatsapp_text = "WHATSAPP: (00) 00000-0000"
+        painter.drawText(whatsapp_x, whatsapp_y, whatsapp_text)
+
+        form_x = 150
+        form_y = 50
+        form_text = "Formulário de Entrega"
+        painter.drawText(form_x, form_y, form_text)
+
+        y = 90
+        painter.setFont(QFont("Arial", 20))
+        painter.drawText(10, y, "TIPO DE ENTREGA: " + self.tipo_entrega_combo.currentText())
+        painter.drawText(10, y + 20, "LOJA: " + self.loja_combo.currentText())
+        painter.drawText(10, y + 40, "CLIENTE: " + self.cliente_edit.text())
+        painter.drawText(10, y + 60, "TELEFONE: " + self.telefone_edit.text())
+        painter.drawText(10, y + 80, "PRODUTO: " + self.produto_edit.toPlainText())
+        painter.drawText(10, y + 100, "ENDEREÇO: " + self.endereco_edit.text())
+        painter.drawText(10, y + 120, "VALOR: " + self.valor_edit.text())
+        painter.drawText(10, y + 140, "FORMA DE PAGAMENTO: " + self.forma_pag_edit.text())
+        painter.drawText(10, y + 160, "OBSERVAÇÕES: " + self.obs_edit.toPlainText())
+
+        painter.end()
                    
     # Adicionar função para abrir o link no Firefox
     def abrir_link_no_firefox(self):
@@ -471,16 +505,12 @@ class Entregas(QMainWindow):
             self.telefone_edit.setText(campos["TELEFONE"])
             self.produto_edit.setPlainText(campos["PRODUTO"])
             self.endereco_edit.setText(campos["ENDEREÇO"])
-            
-            if campos["VALOR"] != "PAGO":
-                self.valor_edit.setText(campos["VALOR"])
-            
-            if campos["PAGAMENTO"] != "PAGO":
-                self.forma_pag_edit.setText(campos["PAGAMENTO"])
-            
+            self.valor_edit.setText(campos["VALOR"])
+            self.forma_pag_edit.setText(campos["PAGAMENTO"])
             self.obs_edit.setPlainText(campos["OBSERVAÇÕES"])
         else:
-            QMessageBox.warning(self, "Arquivo incompatível", "Esse arquivo não foi feito por mim, parça!") 
+            QMessageBox.warning(self, "Arquivo incompatível", "Esse arquivo não foi feito por mim, parça!")
+  
                      
     def get_field_value(self, field_name, text):
         start_index = text.find(field_name)
@@ -523,13 +553,8 @@ class Entregas(QMainWindow):
         self.telefone_edit.setText(telefone)
         self.produto_edit.setPlainText(produto)
         self.endereco_edit.setText(endereco)
-        
-        if valor != "PAGO":
-            self.valor_edit.setText(valor)
-        
-        if forma_pag != "PAGO":
-            self.forma_pag_edit.setText(forma_pag)
-        
+        self.valor_edit.setText(valor)
+        self.forma_pag_edit.setText(forma_pag)
         self.obs_edit.setPlainText(obs)
 
     # limpar formulário
