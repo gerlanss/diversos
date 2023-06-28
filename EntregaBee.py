@@ -319,6 +319,10 @@ class Entregas(QMainWindow):
             scaled_logo = logo.scaledToWidth(100, Qt.SmoothTransformation)
             logo_rect = QRect(0, 0, scaled_logo.width(), scaled_logo.height())
             painter.drawImage(logo_rect, scaled_logo)
+            
+            # Calcula a altura real do logo e adiciona um espaço extra
+            scaled_logo_height = scaled_logo.height()
+            painter.translate(0, scaled_logo_height + 20)
 
             # Configuração dos campos de texto
             campos = [
