@@ -299,9 +299,9 @@ class Entregas(QMainWindow):
         raise UnicodeDecodeError("Nenhuma das codificações fornecidas funcionou.")
 
     def imprimir(self):
+        # Configuração da impressora
         printer = QPrinter(QPrinter.HighResolution)
-        printer.setPageSize(QPrinter.Custom)
-        printer.setPaperSize(QSizeF(74, 105), QPrinter.Millimeter)  #Define o tamanho da página como A7 (74 x 105 mm)
+        printer.setPageSize(QPrinter.A4)
         printer.setPageMargins(2, 2, 2, 2, QPrinter.Millimeter)
         printer.setOutputFormat(QPrinter.NativeFormat)
 
@@ -313,64 +313,35 @@ class Entregas(QMainWindow):
             font = QFont("Arial", 18)
             painter.setFont(font)
 
+            # Carregamento e exibição do logotipo
             logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")
             logo = QImage(logo_path)
             scaled_logo = logo.scaledToWidth(100, Qt.SmoothTransformation)
             logo_rect = QRect(0, 0, scaled_logo.width(), scaled_logo.height())
             painter.drawImage(logo_rect, scaled_logo)
 
-            loja_id = self.loja_combo.currentText().split(" - ")[0]
-            loja_info = self.loja_info.get(loja_id, {"TELEFONE": "", "WHATSAPP": ""})
-            phone_text = loja_info["TELEFONE"]
-            whatsapp_text = loja_info["WHATSAPP"]
+            # Configuração dos campos de texto
+            campos = [
+                ("LOJA: ", self.loja_combo.currentText().upper()),
+                ("CLIENTE: ", self.cliente_edit.text().upper()),
+                ("TELEFONE: ", self.telefone_edit.text().upper()),
+                ("PRODUTO: ", self.produto_edit.toPlainText().upper().splitlines()),
+                ("ENDEREÇO: ", self.endereco_edit.text().upper()),
+                ("VALOR: ", self.valor_edit.text().upper()),
+                ("FORMA DE PAGAMENTO: ", self.forma_pag_edit.text().upper()),
+                ("OBSERVAÇÕES: ", self.obs_edit.toPlainText().upper()),
+            ]
 
-            phone_font = QFont("Arial", 18)
+            # Espaçamento entre as linhas
+            line_spacing = 5
 
-            painter.translate(120, 5)
-            phone_doc = QTextDocument()
-            phone_doc.setDefaultFont(phone_font)
-            phone_doc.setPlainText(phone_text)
-            phone_doc.setTextWidth(printer.pageRect().width())
-
-            phone_ctx = QAbstractTextDocumentLayout.PaintContext()
-            phone_layout = phone_doc.documentLayout()
-            phone_layout.draw(painter, phone_ctx)
-
-            painter.resetTransform()
-            painter.translate(120, 50)
-            whatsapp_doc = QTextDocument()
-            whatsapp_doc.setDefaultFont(phone_font)
-            whatsapp_doc.setPlainText(whatsapp_text)
-            whatsapp_doc.setTextWidth(printer.pageRect().width())
-
-            whatsapp_ctx = QAbstractTextDocumentLayout.PaintContext()
-            whatsapp_layout = whatsapp_doc.documentLayout()
-            whatsapp_layout.draw(painter, whatsapp_ctx)
-
-            painter.resetTransform()
-            painter.translate(0, logo_rect.height() + 10)
-
-            bold_font = QFont("Arial", 20, QFont.Bold)
-
-        campos = [
-            ("LOJA: ", self.loja_combo.currentText().upper()),
-            ("CLIENTE: ", self.cliente_edit.text().upper()),
-            ("TELEFONE: ", self.telefone_edit.text().upper()),
-            ("PRODUTO: ", self.produto_edit.toPlainText().upper().splitlines()),  # Altere esta linha para incluir quebras de linha
-            ("ENDEREÇO: ", self.endereco_edit.text().upper()),
-            ("VALOR: ", self.valor_edit.text().upper()),
-            ("FORMA DE PAGAMENTO: ", self.forma_pag_edit.text().upper()),
-            ("OBSERVAÇÕES: ", self.obs_edit.toPlainText().upper()),
-        ]
-
-        line_spacing = 5
-
-        try:
+            # Impressão dos campos
             for titulo, texto in campos:
                 if not texto:
                     continue
 
-                if isinstance(texto, list):  # Verifique se é uma lista, o que significa que temos várias linhas
+                # Verifica se é uma lista, o que indica que temos várias linhas
+                if isinstance(texto, list):
                     first_line = True
                     for line in texto:
                         if first_line:
@@ -379,43 +350,35 @@ class Entregas(QMainWindow):
                         else:
                             full_text = line
 
-                        painter.setFont(font)
-                        option = QTextOption()
-                        option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
-
+                        # Configuração do documento
                         doc = QTextDocument()
                         doc.setDefaultFont(font)
                         doc.setHtml(full_text)
                         doc.setTextWidth(printer.pageRect().width())
-                        doc.setDefaultTextOption(option)
 
+                        # Exibição do texto
                         ctx = QAbstractTextDocumentLayout.PaintContext()
                         layout = doc.documentLayout()
-
                         layout.draw(painter, ctx)
                         painter.translate(0, doc.size().height() + line_spacing)
                 else:
                     full_text = f'<b>{titulo}</b>{texto}'
-                    painter.setFont(font)
-                    option = QTextOption()
-                    option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
-
+                    
+                    # Configuração do documento
                     doc = QTextDocument()
                     doc.setDefaultFont(font)
                     doc.setHtml(full_text)
                     doc.setTextWidth(printer.pageRect().width())
-                    doc.setDefaultTextOption(option)
 
+                    # Exibição do texto
                     ctx = QAbstractTextDocumentLayout.PaintContext()
                     layout = doc.documentLayout()
-
                     layout.draw(painter, ctx)
                     painter.translate(0, doc.size().height() + line_spacing)
-        except UnboundLocalError:
-            pass  # Ignora o erro e continua a execução do código
 
-        if painter.isActive():  # Verifique se o pintor está ativo antes de finalizá-lo
-            painter.end()
+            # Verifica se o pintor ainda está ativo antes de finalizá-lo
+            if painter.isActive():
+                painter.end()
         
     def preparar_impressao(self, printer):
         painter = QPainter(printer)
