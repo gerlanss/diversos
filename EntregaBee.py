@@ -1,60 +1,24 @@
-# Importações padrão
 import os
 import subprocess
 import platform
 import ctypes
+import qrcode
 import re
+from PyQt5.QtCore import QTimer
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtCore import QUrl
+from PIL import Image, ImageDraw, ImageOps
+from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
+from PyQt5.QtGui import QFont, QImage, QPixmap, QIcon, QPainter, QTextDocument, QFontMetrics, QAbstractTextDocumentLayout, QTextOption, QPageSize
+from PyQt5.QtCore import Qt, QRect, QSizeF, QEvent, QRectF
+from PyQt5.QtWidgets import QApplication, QDialog, QPlainTextEdit, QMainWindow, QComboBox, QMessageBox, QLineEdit, QLabel, QPushButton, QTextEdit, QHBoxLayout, QWidget, QFileDialog, QVBoxLayout, QDesktopWidget, QProgressBar
 import sys
 
-# Importações relacionadas a imagens e QRCode
-from PIL import Image, ImageDraw, ImageOps
-import qrcode
-
-# Importações do PyQt5
-from PyQt5.QtCore import Qt, QRect, QSizeF, QEvent, QRectF, QTimer, QUrl
-from PyQt5.QtGui import (QFont, QImage, QPixmap, QIcon, QPainter, QTextDocument,
-                         QFontMetrics, QAbstractTextDocumentLayout, QTextOption, QPageSize)
-from PyQt5.QtWidgets import (QApplication, QDialog, QPlainTextEdit, QMainWindow, QComboBox,
-                             QMessageBox, QLineEdit, QLabel, QPushButton, QTextEdit, QHBoxLayout,
-                             QWidget, QFileDialog, QVBoxLayout, QDesktopWidget, QProgressBar)
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
-
-
-# Estilização da Interface
-ESTILO = """
-    QWidget {
-        font-family: 'Arial';
-        font-size: 12px;
-    }
-    QPushButton {
-        background-color: #007BFF;
-        color: white;
-        border: none;
-        padding: 5px 15px;
-        border-radius: 5px;
-    }
-    QPushButton:hover {
-        background-color: #0056b3;
-    }
-    QLabel {
-        color: #333;
-    }
-    QComboBox, QLineEdit, QTextEdit, QPlainTextEdit {
-        padding: 5px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-    }
-    QComboBox:hover, QLineEdit:hover, QTextEdit:hover, QPlainTextEdit:hover {
-        border-color: #007BFF;
-    }
-"""
 
 class CustomPlainTextEdit(QPlainTextEdit):
-    """
-    Subclasse do QPlainTextEdit que permite tratamento especial para a tecla Tab.
-    Move o foco para o próximo widget em vez de inserir um caractere de tabulação.
-    """
+    # Essa é uma subclasse do QPlainTextEdit que nos permite
+    # fazer um tratamento especial para a tecla Tab, fazendo-a
+    # mover o foco para o próximo widget em vez de inserir um caractere de tabulação.
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.installEventFilter(self)
@@ -65,56 +29,21 @@ class CustomPlainTextEdit(QPlainTextEdit):
             return True
         return super().eventFilter(obj, event)
 
-
+    
 class Entregas(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setupUI()
-        self.connectSignalsSlots()
-
-    def setupUI(self):
-        # Configurações iniciais da janela e ícone para Windows
-        if os.name == 'nt':
-            myappid = 'Entregas 8.6'
+        if os.name == 'nt':  # Verifica se o sistema operacional é Windows
+            # Carrega o ícone para o aplicativo
+            myappid = 'Entregas 8.6'  # Um identificador arbitrário para o aplicativo
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
             self.setWindowIcon(QIcon('favicon.ico'))
             self.centralizar()
 
-        # Configurações da janela principal
+        # definir janela principal
         self.setWindowTitle("ENTREGAS")
         self.setGeometry(100, 100, 500, 400)
         
-        self.setStyleSheet("""
-        QMainWindow {
-            background-color: #f5f5f5;
-        }
-        QLabel {
-            font-size: 12px;
-            color: #333;
-        }
-        QPushButton {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 12px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border-radius: 4px;
-        }
-        QPushButton:hover {
-            background-color: #45a049;
-        }
-        QComboBox, QLineEdit, QTextEdit, QPlainTextEdit {
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-    """)
         # Informações sobre cada loja
         self.loja_info = {
             "01": {"TELEFONE": "Telefone: (95) 3623-7063", "WHATSAPP": "Whatsapp: (95) 3623-7063"},
@@ -122,6 +51,7 @@ class Entregas(QMainWindow):
             "03": {"TELEFONE": "Telefone: (95) 3623-0207", "WHATSAPP": "Whatsapp: (95) 3623-7063"},
             "04": {"TELEFONE": "Telefone: (95) 3623-7303", "WHATSAPP": "Whatsapp: (95) 3623-7063"},
             "05": {"TELEFONE": "Telefone: (95) 3224-6545", "WHATSAPP": "Whatsapp: (95) 3623-7063"},
+            "06": {"TELEFONE": "Telefone: (95) 0000-0000", "WHATSAPP": "Whatsapp: (95) 3623-7063"},
         }
         self.telefone_loja = ""
         self.whatsapp_loja = ""
@@ -134,7 +64,7 @@ class Entregas(QMainWindow):
         self.tipo_entrega_combo.currentTextChanged.connect(self.tipo_entrega_selecionada)
         self.loja_label = QLabel("LOJA:")
         self.loja_combo = QComboBox()
-        self.loja_combo.addItems(["01", "02", "03", "04", "05"])
+        self.loja_combo.addItems(["01", "02", "03", "04", "05", "06"])
         self.loja_combo.currentTextChanged.connect(self.loja_selecionada)
         self.cliente_label = QLabel("CLIENTE:")
         self.cliente_edit = QLineEdit()
