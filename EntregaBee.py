@@ -1,16 +1,60 @@
+# Importações padrão
 import os
 import subprocess
 import platform
 import ctypes
-import qrcode
-from PIL import Image, ImageDraw, ImageOps
-from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
-from PyQt5.QtGui import QFont, QImage, QPixmap, QIcon, QPainter, QTextDocument, QFontMetrics, QAbstractTextDocumentLayout, QTextOption
-from PyQt5.QtCore import Qt, QRect, QSizeF, QEvent, QRectF
-from PyQt5.QtWidgets import QApplication, QDialog, QPlainTextEdit, QMainWindow, QComboBox, QMessageBox, QLineEdit, QLabel, QPushButton, QTextEdit, QHBoxLayout, QWidget, QFileDialog, QVBoxLayout, QDesktopWidget
+import re
 import sys
 
+# Importações relacionadas a imagens e QRCode
+from PIL import Image, ImageDraw, ImageOps
+import qrcode
+
+# Importações do PyQt5
+from PyQt5.QtCore import Qt, QRect, QSizeF, QEvent, QRectF, QTimer, QUrl
+from PyQt5.QtGui import (QFont, QImage, QPixmap, QIcon, QPainter, QTextDocument,
+                         QFontMetrics, QAbstractTextDocumentLayout, QTextOption, QPageSize)
+from PyQt5.QtWidgets import (QApplication, QDialog, QPlainTextEdit, QMainWindow, QComboBox,
+                             QMessageBox, QLineEdit, QLabel, QPushButton, QTextEdit, QHBoxLayout,
+                             QWidget, QFileDialog, QVBoxLayout, QDesktopWidget, QProgressBar)
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
+
+
+# Estilização da Interface
+ESTILO = """
+    QWidget {
+        font-family: 'Arial';
+        font-size: 12px;
+    }
+    QPushButton {
+        background-color: #007BFF;
+        color: white;
+        border: none;
+        padding: 5px 15px;
+        border-radius: 5px;
+    }
+    QPushButton:hover {
+        background-color: #0056b3;
+    }
+    QLabel {
+        color: #333;
+    }
+    QComboBox, QLineEdit, QTextEdit, QPlainTextEdit {
+        padding: 5px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+    QComboBox:hover, QLineEdit:hover, QTextEdit:hover, QPlainTextEdit:hover {
+        border-color: #007BFF;
+    }
+"""
+
 class CustomPlainTextEdit(QPlainTextEdit):
+    """
+    Subclasse do QPlainTextEdit que permite tratamento especial para a tecla Tab.
+    Move o foco para o próximo widget em vez de inserir um caractere de tabulação.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.installEventFilter(self)
@@ -21,20 +65,57 @@ class CustomPlainTextEdit(QPlainTextEdit):
             return True
         return super().eventFilter(obj, event)
 
+
 class Entregas(QMainWindow):
     def __init__(self):
         super().__init__()
-        if os.name == 'nt':  # Verifica se o sistema operacional é Windows
-            # Carrega o ícone para o aplicativo
-            myappid = 'Entregas 7.1'  # Um identificador arbitrário para o aplicativo
+        self.setupUI()
+        self.connectSignalsSlots()
+
+    def setupUI(self):
+        # Configurações iniciais da janela e ícone para Windows
+        if os.name == 'nt':
+            myappid = 'Entregas 8.6'
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
             self.setWindowIcon(QIcon('favicon.ico'))
             self.centralizar()
 
-# definir janela principal
+        # Configurações da janela principal
         self.setWindowTitle("ENTREGAS")
         self.setGeometry(100, 100, 500, 400)
         
+        self.setStyleSheet("""
+        QMainWindow {
+            background-color: #f5f5f5;
+        }
+        QLabel {
+            font-size: 12px;
+            color: #333;
+        }
+        QPushButton {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 12px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        QPushButton:hover {
+            background-color: #45a049;
+        }
+        QComboBox, QLineEdit, QTextEdit, QPlainTextEdit {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    """)
+        # Informações sobre cada loja
         self.loja_info = {
             "01": {"TELEFONE": "Telefone: (95) 3623-7063", "WHATSAPP": "Whatsapp: (95) 3623-7063"},
             "02": {"TELEFONE": "Telefone: (95) 3627-1053", "WHATSAPP": "Whatsapp: (95) 3623-7063"},
@@ -45,7 +126,8 @@ class Entregas(QMainWindow):
         self.telefone_loja = ""
         self.whatsapp_loja = ""
         self.loja_selecionada("01")
-        # definir widgets
+        
+        # Criação dos widgets (campos de entrada e rótulos)
         self.tipo_entrega_label = QLabel("TIPO DE ENTREGA:")
         self.tipo_entrega_combo = QComboBox()
         self.tipo_entrega_combo.addItems(["ENTREGA BEE", "ENTREGA ROTA", "RETIRADA EM LOJA"])
@@ -74,6 +156,7 @@ class Entregas(QMainWindow):
         self.forma_pag_edit = QLineEdit()
         self.obs_label = QLabel("OBSERVAÇÕES:")
         self.obs_edit = QTextEdit()
+        
         # definir layout horizontal
         hbox = QHBoxLayout()
 
@@ -98,6 +181,7 @@ class Entregas(QMainWindow):
         
         self.carregar_btn = QPushButton("CARREGAR")
         hbox.addWidget(self.carregar_btn)
+        
         # Adicione esta linha para criar a instância do clipboard
         self.clipboard = QApplication.clipboard()
 
@@ -140,6 +224,8 @@ class Entregas(QMainWindow):
         self.limpar_btn.clicked.connect(self.limpar)
         self.carregar_btn.clicked.connect(self.carregar_formulario)
         
+    # Esta função é chamada quando a seleção no combo box de tipo de entrega muda.
+    # Ela mostra ou oculta os botões e campos de entrada apropriados com base no tipo de entrega selecionado.
     def tipo_entrega_selecionada(self, tipo_entrega):
         if tipo_entrega == "ENTREGA ROTA":
             self.agendar_btn.show()
@@ -157,11 +243,14 @@ class Entregas(QMainWindow):
             self.telefone_label.show()
             self.telefone_edit.show()
 
+    # Esta função é usada para calcular a altura de um campo de entrada de texto com base em um número de linhas.
     def calcular_altura_campo_texto(self, campo, num_linhas):
         metricas_fonte = QFontMetrics(campo.font())
         altura = (metricas_fonte.lineSpacing() * num_linhas) + (campo.contentsMargins().top() + campo.contentsMargins().bottom())
         return altura        
         
+    # Esta função é chamada quando a seleção no combo box de loja muda.
+    # Ela atualiza os campos de telefone e whatsapp com base na loja selecionada.
     def loja_selecionada(self, loja=None):
         if loja is None:
             loja = self.loja_combo.currentText()
@@ -174,7 +263,7 @@ class Entregas(QMainWindow):
             self.whatsapp_loja = None
                     
     def gravar_copiar(self):
-        # obter dados do formulário
+        # Obtenha os dados do formulário
         tipo_entrega = self.tipo_entrega_combo.currentText()
         loja = self.loja_combo.currentText()
         cliente = self.cliente_edit.text().upper()
@@ -185,17 +274,19 @@ class Entregas(QMainWindow):
         forma_pag = self.forma_pag_edit.text().upper()
         obs = self.obs_edit.toPlainText().upper()
 
+        # Se o campo forma_pag está vazio, preencha com "PAGO"
         if not forma_pag:
-            forma_pag = "PAGO"
+            forma_pag = "PAGO, SOMENTE ENTREGAR"
 
-        if not valor:
-            valor = "PAGO"
+        # Se o campo valor é igual a "R$", então esvazie o campo
+        if valor == "R$":
+            valor = ""
 
-        # verificar se pasta de Entregas existe
+        # Verifique se a pasta "Entregas" existe, caso contrário, crie-a
         if not os.path.exists(os.path.join(os.path.expanduser('~'), "Documents", "Entregas")):
             os.makedirs(os.path.join(os.path.expanduser('~'), "Documents", "Entregas"))
 
-        # criar arquivo de texto
+        # Crie um arquivo de texto com os dados do formulário
         filename = os.path.join(os.path.expanduser('~'), "Documents", "Entregas", f"{cliente}_{telefone}.txt")
         with open(filename, "w") as f:
             f.write(f"ENTREGAS\n")
@@ -205,11 +296,12 @@ class Entregas(QMainWindow):
             f.write(f"TELEFONE: {telefone}\n")
             f.write(f"PRODUTO: {produto}\n")
             f.write(f"ENDEREÇO: {endereco}\n")
-            f.write(f"VALOR: {valor}\n")
+            if valor != "":
+                f.write(f"VALOR: {valor}\n")
             f.write(f"PAGAMENTO: {forma_pag}\n")
             f.write(f"OBSERVAÇÕES: {obs}\n")
 
-        # copiar para a área de transferência
+        # Prepare os dados para copiar para a área de transferência
         campos = [
             (tipo_entrega,"\n"),
             ("LOJA:", loja),
@@ -225,29 +317,52 @@ class Entregas(QMainWindow):
         mensagem_formatada = ''
 
         for campo, valor in campos:
-            if valor:
+            if valor and valor.strip() != "R$":
                 mensagem_formatada += f"*{campo}* {valor}\n"
 
         mensagem_formatada += "\n"
 
+        # Copie a mensagem formatada para a área de transferência
         self.clipboard.setText(mensagem_formatada)
 
-        # exibir caixa de mensagem
+        # Mostre uma caixa de mensagem informando que o formulário foi gravado e copiado
         QMessageBox.information(self, "Gravado e Copiado", "Formulario Gravado e copiado com sucesso ^_^")
 
     def gerar_qrcode(self):
-        # Obter os valores dos campos
+        # Obtenha os valores dos campos
         tipo_entrega = self.tipo_entrega_combo.currentText()
         loja = self.loja_combo.currentText()
         cliente = self.cliente_edit.text()
+        
+        # Obtenha o valor do campo de telefone e remova parênteses e hífens
         telefone = self.telefone_edit.text()
+        telefone = telefone.replace('(', '').replace(')', '').replace(' ', '').replace('-', '')
+
+        # Formate o número de telefone
+        telefone = re.sub(r'(\d{2})(\d{4,5})(\d{4})', r'\1.\2-\3', telefone)
+        
         produto = self.produto_edit.toPlainText()
+        
+        # Obtenha o valor do campo de endereço e divida no primeiro número encontrado
         endereco = self.endereco_edit.text()
+        partes = re.split(r'(\d+)', endereco, maxsplit=1)
+
+        try:
+            # Remova qualquer espaço ou hífen imediatamente após o número e junte todas as partes de volta
+            partes[2] = partes[2].lstrip(' -')
+            endereco = "".join(partes[0:2]) + "_" + partes[2]
+
+            # Divida o endereço no primeiro número encontrado e junte com um underscore
+            partes = re.split(r'(\d+)', endereco, maxsplit=1)
+            endereco = "_".join(partes)
+        except IndexError:
+            pass  # Ignore o erro e continue com o endereço original se não puder ser dividido
+        
         valor = self.valor_edit.text()
-        forma_pag = self.forma_pag_edit.text() if self.forma_pag_edit.text() else "PAGO"
+        forma_pag = self.forma_pag_edit.text() if self.forma_pag_edit.text() else "PAGO, SOMENTE ENTREGAR"
         obs = self.obs_edit.toPlainText()
 
-        # Criar uma string com os títulos e os valores dos campos
+        # Crie uma string com os títulos e os valores dos campos
         dados = ""
         if tipo_entrega:
             dados += f"*{tipo_entrega}*\n\n"
@@ -261,14 +376,17 @@ class Entregas(QMainWindow):
             dados += f"*PRODUTO:* {produto}\n"
         if endereco:
             dados += f"*ENDEREÇO:* {endereco}\n"
-        dados += f"*VALOR:* {valor}\n"
+        if valor and valor.strip() != "R$":
+            dados += f"*VALOR:* {valor}\n"
         dados += f"*PAGAMENTO:* {forma_pag}\n"
         if obs:
             dados += f"*OBSERVAÇÕES:* {obs}\n\n"
-
-        # Gerar o QRCode com os dados
+        
+        dados += "\n\n"
+        
+        # Gere um QRCode com os dados
         qr = qrcode.QRCode(
-            version=4,  # Aumentar a versão do QRCode
+            version=1,  # Aumente a versão do QRCode
             error_correction=qrcode.constants.ERROR_CORRECT_H,
             box_size=20,
             border=1
@@ -277,74 +395,130 @@ class Entregas(QMainWindow):
         qr.make(fit=True)
         qrcode_img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
 
-        # Redimensionar o QR Code para 250x250
+        # Redimensione o QRCode para 250x250
         qrcode_img = qrcode_img.resize((250, 250), Image.NEAREST)
 
-        # Salvar a imagem como PNG
+        # Salve a imagem como PNG
         png_file_path = "qrcode.png"
         qrcode_img.save(png_file_path)
 
-        # Exibir o QRCode
+        # Exiba o QRCode
         qrcode_img.show()
 
-    #Usar codificadores para ler documentos com varios caracteres
+    # Use codificadores para ler documentos com vários caracteres
     def read_file_with_multiple_encodings(self, file_path, encodings=("utf-8", "cp1252", "latin-1")):
         for encoding in encodings:
             try:
+                # Tente abrir e ler o arquivo com o codificador atual
                 with open(file_path, "r", encoding=encoding) as f:
                     text = f.read()
                 return text
             except UnicodeDecodeError:
                 pass
+        # Se nenhum dos codificadores funcionou, levante um erro
         raise UnicodeDecodeError("Nenhuma das codificações fornecidas funcionou.")
 
     def imprimir(self):
-        # Configuração da impressora
+        # Configura uma impressora com alta resolução e margens definidas
         printer = QPrinter(QPrinter.HighResolution)
-        printer.setPageSize(QPrinter.A4)
         printer.setPageMargins(2, 2, 2, 2, QPrinter.Millimeter)
         printer.setOutputFormat(QPrinter.NativeFormat)
 
+        # Cria um diálogo de impressão
         dialog = QPrintDialog(printer, self)
 
-        painter = QPainter()
+        # Se o diálogo de impressão for aceito, continua com o processo de impressão
         if dialog.exec_() == QDialog.Accepted:
+            dpi = printer.resolution()
+            font_size = round(12 * dpi / 150)  # Ajusta o tamanho da fonte com base na resolução da impressora
+            line_spacing = font_size * 0.5
+
+            painter = QPainter()
             painter.begin(printer)
-            font = QFont("Arial", 18)
+            font = QFont("Arial", font_size)
             painter.setFont(font)
 
-            # Carregamento e exibição do logotipo
+            # Ajusta a largura do documento para 80mm
+            mm_width = 80
+            doc_width = int(mm_width / 30 * dpi)
+
+            total_height = 0
+
+            # Carrega o logo
             logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")
             logo = QImage(logo_path)
-            scaled_logo = logo.scaledToWidth(100, Qt.SmoothTransformation)
+
+            # Redimensiona o logo
+            scaled_logo = logo.scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             logo_rect = QRect(0, 0, scaled_logo.width(), scaled_logo.height())
             painter.drawImage(logo_rect, scaled_logo)
-            
-            # Calcula a altura real do logo e adiciona um espaço extra
-            scaled_logo_height = scaled_logo.height()
-            painter.translate(0, scaled_logo_height + 20)
+            total_height += scaled_logo.height()
 
-            # Configuração dos campos de texto
+            # Ajusta a posição do painter
+            painter.translate(20, 0)
+
+            # Obtém as informações da loja
+            loja_id = self.loja_combo.currentText().split(" - ")[0]
+            loja_info = self.loja_info.get(loja_id, {"TELEFONE": "", "WHATSAPP": ""})
+            phone_text = loja_info["TELEFONE"]
+            whatsapp_text = loja_info["WHATSAPP"]
+
+            # Configura a fonte para o telefone
+            phone_font = QFont("Arial", font_size)
+            painter.setFont(phone_font)
+            painter.translate(scaled_logo.width(), 0)
+
+            # Configura o documento para o telefone
+            phone_doc = QTextDocument()
+            phone_doc.setDefaultFont(phone_font)
+            phone_doc.setPlainText(phone_text)
+            phone_doc.setTextWidth(doc_width / 2)
+
+            # Desenha o texto do telefone
+            phone_ctx = QAbstractTextDocumentLayout.PaintContext()
+            phone_layout = phone_doc.documentLayout()
+            phone_layout.draw(painter, phone_ctx)
+
+            # Move o "pincel" para baixo pela altura do texto do telefone
+            painter.translate(0, phone_doc.size().height() + line_spacing)
+
+            # Configura a fonte para o WhatsApp
+            whatsapp_font = QFont("Arial", font_size)
+            whatsapp_doc = QTextDocument()
+            whatsapp_doc.setDefaultFont(whatsapp_font)
+            whatsapp_doc.setPlainText(whatsapp_text)
+            whatsapp_doc.setTextWidth(doc_width / 2)
+
+            # Desenha o texto do WhatsApp
+            whatsapp_ctx = QAbstractTextDocumentLayout.PaintContext()
+            whatsapp_layout = whatsapp_doc.documentLayout()
+            whatsapp_layout.draw(painter, whatsapp_ctx)
+
+            # Move o "pincel" para baixo pela altura do texto do WhatsApp
+            painter.translate(0, whatsapp_doc.size().height() + line_spacing)
+
+            # Retoma a fonte original
+            painter.setFont(font)
+            painter.translate(-scaled_logo.width(), total_height)
+
+            # Define os campos para impressão
             campos = [
-                ("LOJA: ", self.loja_combo.currentText().upper()),
-                ("CLIENTE: ", self.cliente_edit.text().upper()),
-                ("TELEFONE: ", self.telefone_edit.text().upper()),
+                ("LOJA: ", self.loja_combo.currentText().upper().splitlines()),
+                ("CLIENTE: ", self.cliente_edit.text().upper().splitlines()),
+                ("TELEFONE: ", self.telefone_edit.text().upper().splitlines()),
                 ("PRODUTO: ", self.produto_edit.toPlainText().upper().splitlines()),
-                ("ENDEREÇO: ", self.endereco_edit.text().upper()),
-                ("VALOR: ", self.valor_edit.text().upper()),
-                ("FORMA DE PAGAMENTO: ", self.forma_pag_edit.text().upper()),
-                ("OBSERVAÇÕES: ", self.obs_edit.toPlainText().upper()),
+                ("ENDEREÇO: ", self.endereco_edit.text().upper().splitlines()),
+                ("VALOR: ", self.valor_edit.text().upper().splitlines() if self.valor_edit.text().strip() != "R$" else []),
+                ("PAGAMENTO: ", self.forma_pag_edit.text().upper().splitlines() if self.forma_pag_edit.text().strip() else ["PAGO, SOMENTE ENTREGAR"]),
+                ("OBSERVAÇÕES: ", self.obs_edit.toPlainText().upper().splitlines()),
             ]
 
-            # Espaçamento entre as linhas
-            line_spacing = 5
-
-            # Impressão dos campos
+            # Imprime cada campo
             for titulo, texto in campos:
                 if not texto:
                     continue
 
-                # Verifica se é uma lista, o que indica que temos várias linhas
+                # Trata o caso em que o texto é uma lista
                 if isinstance(texto, list):
                     first_line = True
                     for line in texto:
@@ -354,100 +528,106 @@ class Entregas(QMainWindow):
                         else:
                             full_text = line
 
-                        # Configuração do documento
                         doc = QTextDocument()
                         doc.setDefaultFont(font)
                         doc.setHtml(full_text)
-                        doc.setTextWidth(printer.pageRect().width())
+                        doc.setTextWidth(doc_width)
+                        option = QTextOption()
+                        option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+                        doc.setDefaultTextOption(option)
 
-                        # Exibição do texto
                         ctx = QAbstractTextDocumentLayout.PaintContext()
                         layout = doc.documentLayout()
                         layout.draw(painter, ctx)
                         painter.translate(0, doc.size().height() + line_spacing)
                 else:
+                    # Caso o texto não seja uma lista
                     full_text = f'<b>{titulo}</b>{texto}'
-                    
-                    # Configuração do documento
                     doc = QTextDocument()
                     doc.setDefaultFont(font)
                     doc.setHtml(full_text)
-                    doc.setTextWidth(printer.pageRect().width())
+                    doc.setTextWidth(doc_width)
+                    option = QTextOption()
+                    option.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+                    doc.setDefaultTextOption(option)
 
-                    # Exibição do texto
                     ctx = QAbstractTextDocumentLayout.PaintContext()
                     layout = doc.documentLayout()
                     layout.draw(painter, ctx)
                     painter.translate(0, doc.size().height() + line_spacing)
 
-            # Verifica se o pintor ainda está ativo antes de finalizá-lo
+            # Finaliza o pintor, se ainda estiver ativo
             if painter.isActive():
                 painter.end()
-        
-    def preparar_impressao(self, printer):
-        painter = QPainter(printer)
 
-        logo_rect = QRectF(25, 25, 130, 65)
-        logo_image = QImage("logo.png")
-        painter.drawImage(logo_rect, logo_image)
-
-        painter.setFont(QFont("Arial", 18))
-
-        telefone_x = 150
-        telefone_y = 10
-        telefone_text = "TELEFONE: (00) 00000-0000"
-        painter.drawText(telefone_x, telefone_y, telefone_text)
-
-        whatsapp_x = 150
-        whatsapp_y = 30
-        whatsapp_text = "WHATSAPP: (00) 00000-0000"
-        painter.drawText(whatsapp_x, whatsapp_y, whatsapp_text)
-
-        form_x = 150
-        form_y = 50
-        form_text = "Formulário de Entrega"
-        painter.drawText(form_x, form_y, form_text)
-
-        y = 90
-        painter.setFont(QFont("Arial", 20))
-        painter.drawText(10, y, "TIPO DE ENTREGA: " + self.tipo_entrega_combo.currentText())
-        painter.drawText(10, y + 20, "LOJA: " + self.loja_combo.currentText())
-        painter.drawText(10, y + 40, "CLIENTE: " + self.cliente_edit.text())
-        painter.drawText(10, y + 60, "TELEFONE: " + self.telefone_edit.text())
-        painter.drawText(10, y + 80, "PRODUTO: " + self.produto_edit.toPlainText())
-        painter.drawText(10, y + 100, "ENDEREÇO: " + self.endereco_edit.text())
-        painter.drawText(10, y + 120, "VALOR: " + self.valor_edit.text())
-        painter.drawText(10, y + 140, "FORMA DE PAGAMENTO: " + self.forma_pag_edit.text())
-        painter.drawText(10, y + 160, "OBSERVAÇÕES: " + self.obs_edit.toPlainText())
-
-        painter.end()
-                   
-    # Adicionar função para abrir o link no Firefox
+    # Adiciona função para abrir o link no Firefox
     def abrir_link_no_firefox(self):
-        firefox_path = None
+        # Cria uma caixa de mensagem para a escolha do link
+        msg = QMessageBox()
+        msg.setWindowTitle("Escolha o link")
+        msg.setText("Escolha o link que deseja abrir:")
+        interno = msg.addButton('INTERNO', QMessageBox.YesRole)
+        externo = msg.addButton('EXTERNO', QMessageBox.NoRole)
+        msg.exec_()
 
-        if platform.system() == "Windows":
-            firefox_path = "C:\\Program Files\\Mozilla Firefox\\firefox.exe"
-            if not os.path.exists(firefox_path):
-                firefox_path = "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"
-        elif platform.system() == "Linux":
-            firefox_path = "/usr/bin/firefox"
-        elif platform.system() == "Darwin":
-            firefox_path = "/Applications/Firefox.app/Contents/MacOS/firefox"
-
-        if firefox_path and os.path.exists(firefox_path):
-            link = "http://192.168.3.23:8080/Easytech/sg0026.do?method=gotoComando&comando=atd0102.do?method=prepTela"
-            subprocess.Popen([firefox_path, link])
+        # Decide o link final com base na escolha do usuário
+        if msg.clickedButton() == interno:
+            self.final_link = "http://192.168.3.23:8080/Easytech/sg0026.do?method=gotoComando&comando=atd0102.do?method=prepTela"
+            login_link = "http://192.168.3.23:8080/Easytech//sgw0001.do?method=login"
         else:
-            QMessageBox.warning(self, "Erro", "O Firefox não foi encontrado no sistema. Por favor, instale o Firefox e tente novamente.")               
-            
+            self.final_link = "http://192.140.42.140:8080/Easytech/sg0026.do?method=gotoComando&comando=atd0102.do?method=prepTela"
+            login_link = "http://192.140.42.140:8080/Easytech//sgw0001.do?method=login"
+
+        # Configura a view do navegador web
+        self.webView = QWebEngineView()
+
+        # Cria uma barra de progresso
+        self.progress = QProgressBar(self.webView)
+        self.progress.resize(400, 20)
+        self.progress.move(0, self.webView.height() - self.progress.height())
+        self.progress.show()
+
+        # Conecta os sinais à barra de progresso
+        self.webView.loadStarted.connect(self.inicio_carregamento)
+        self.webView.loadProgress.connect(self.progress.setValue)
+        self.webView.loadFinished.connect(self.fim_carregamento)
+
+        # Carrega o link de login
+        self.webView.load(QUrl(login_link))
+        self.webView.show()
+        self.webView.urlChanged.connect(self.manipulaMudancaUrl)
+
+    # Método para o início do carregamento da página
+    def inicio_carregamento(self):
+        self.progress.setValue(0)  # Valor mínimo quando o carregamento começar
+
+    # Método para o fim do carregamento da página
+    def fim_carregamento(self):
+        self.progress.setValue(100)  # Valor máximo quando o carregamento terminar
+        QTimer.singleShot(5000, self.progress.hide)  # Esconder a barra de progresso 5 segundos após o carregamento terminar
+
+    # Método para tratar a mudança de URL
+    def manipulaMudancaUrl(self, url):
+        # Se a URL contém "buscarEmpresa", carrega o link final
+        if "buscarEmpresa" in url.toString():
+            self.webView.load(QUrl(self.final_link))
+        # Se a URL contém "method=gravar", fecha a janela após 5 segundos
+        elif "method=gravar" in url.toString():
+            QTimer.singleShot(5000, self.webView.close)
+                
     def editar(self):
+        # Define o caminho para a pasta de entregas
         folder_path = os.path.join(os.path.expanduser('~'), "Documents", "Entregas")
+
+        # Cria um diálogo para abrir um arquivo no diretório de entregas
         filename, _ = QFileDialog.getOpenFileName(self, "Abrir arquivo", folder_path, "Arquivos de texto (*.txt)")
+
+        # Se um arquivo for selecionado, o conteúdo do arquivo é lido e os campos do formulário são preenchidos
         if filename:
             with open(filename, "r") as f:
                 lines = f.readlines()
 
+            # Dicionário para armazenar os valores dos campos
             campos = {
                 "TIPO DE ENTREGA": "",
                 "LOJA": "",
@@ -460,25 +640,33 @@ class Entregas(QMainWindow):
                 "OBSERVAÇÕES": ""
             }
 
+            # Para cada linha no arquivo, procura por cada campo e salva o valor correspondente
             for line in lines:
                 for campo in campos:
                     if line.startswith(campo):
                         campos[campo] = line.split(":")[1].strip()
                         break
 
+            # Define os valores dos campos do formulário
             self.tipo_entrega_combo.setCurrentText(campos["TIPO DE ENTREGA"])
             self.loja_combo.setCurrentText(campos["LOJA"])
             self.cliente_edit.setText(campos["CLIENTE"])
             self.telefone_edit.setText(campos["TELEFONE"])
             self.produto_edit.setPlainText(campos["PRODUTO"])
             self.endereco_edit.setText(campos["ENDEREÇO"])
-            self.valor_edit.setText(campos["VALOR"])
-            self.forma_pag_edit.setText(campos["PAGAMENTO"])
+            
+            if campos["VALOR"] != "PAGO, SOMENTE ENTREGAR":
+                self.valor_edit.setText(campos["VALOR"])
+            
+            if campos["PAGAMENTO"] != "PAGO, SOMENTE ENTREGAR":
+                self.forma_pag_edit.setText(campos["PAGAMENTO"])
+            
             self.obs_edit.setPlainText(campos["OBSERVAÇÕES"])
         else:
-            QMessageBox.warning(self, "Arquivo incompatível", "Esse arquivo não foi feito por mim, parça!")
-  
-                     
+            # Se o arquivo não foi gerado pelo programa, exibe uma mensagem de aviso
+            QMessageBox.warning(self, "Arquivo incompatível", "Esse arquivo não foi feito por mim, parça!") 
+
+    # Método para obter o valor de um campo específico em um texto
     def get_field_value(self, field_name, text):
         start_index = text.find(field_name)
         if start_index == -1:
@@ -491,11 +679,12 @@ class Entregas(QMainWindow):
 
         return text[start_index:end_index].strip()
 
+    # Método para carregar o formulário com os valores dos campos copiados
     def carregar_formulario(self):
-        # obter texto copiado
+        # Obtem o texto copiado
         clipboard_text = QApplication.clipboard().text()
 
-        # obter valores dos campos usando a função get_field_value
+        # Obtem valores dos campos usando a função get_field_value
         tipo_entrega = ""
         if "ENTREGA BEE" in clipboard_text:
             tipo_entrega = "ENTREGA BEE"
@@ -513,18 +702,23 @@ class Entregas(QMainWindow):
         forma_pag = self.get_field_value("PAGAMENTO:", clipboard_text)
         obs = self.get_field_value("OBSERVAÇÕES:", clipboard_text)
 
-        # preencher widgets do formulário com os valores correspondentes
+        # Preenche os widgets do formulário com os valores correspondentes
         self.tipo_entrega_combo.setCurrentIndex(self.tipo_entrega_combo.findText(tipo_entrega))
         self.loja_combo.setCurrentText(loja)
         self.cliente_edit.setText(cliente)
         self.telefone_edit.setText(telefone)
         self.produto_edit.setPlainText(produto)
         self.endereco_edit.setText(endereco)
-        self.valor_edit.setText(valor)
-        self.forma_pag_edit.setText(forma_pag)
+        
+        if valor != "PAGO, SOMENTE ENTREGAR":
+            self.valor_edit.setText(valor)
+        
+        if forma_pag != "PAGO, SOMENTE ENTREGAR":
+            self.forma_pag_edit.setText(forma_pag)
+        
         self.obs_edit.setPlainText(obs)
 
-    # limpar formulário
+    # Método para limpar todos os campos do formulário
     def limpar(self):
         self.loja_combo.setCurrentIndex(0)
         self.cliente_edit.clear()
@@ -534,15 +728,15 @@ class Entregas(QMainWindow):
         self.valor_edit.clear()
         self.forma_pag_edit.clear()
         self.obs_edit.clear()
-        
-        #formatar telefone 
+
+    # Método para formatar o telefone
     def formatar_telefone(self):
         telefone = self.telefone_edit.text()
         if len(telefone) == 11 and not telefone.startswith("("):
             telefone_formatado = f"({telefone[:2]}) {telefone[2:6]}-{telefone[6:]}"
             self.telefone_edit.setText(telefone_formatado)
 
-        #Formatar valor
+    # Método para formatar o valor
     def formatar_valor(self):
         valor = self.valor_edit.text().replace(',', '.').replace('R$', '').strip()
         if not valor:
@@ -553,7 +747,8 @@ class Entregas(QMainWindow):
             self.valor_edit.setText(valor_formatado)
         except ValueError:
             pass
-        #verificar se campo valor está vazio
+
+    # Método para verificar se o campo de valor está vazio
     def valor_edit_focusInEvent(self, event):
         valor = self.valor_edit.text()
         if valor == 'R$ 0,00':
@@ -562,16 +757,16 @@ class Entregas(QMainWindow):
         elif not valor.startswith("R$"):
             self.valor_edit.setText(f"R$ {valor}")
         super(QLineEdit, self.valor_edit).focusInEvent(event)
-        
-        #Centralizar Janela
+
+    # Método para centralizar a janela
     def centralizar(self):
         frame = self.frameGeometry()
         center_point = QDesktopWidget().availableGeometry().center()
         frame.moveCenter(center_point)
         self.move(frame.topLeft())
-    
+        
 
-# definir janela principal
+# Definição da janela principal
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = Entregas()
